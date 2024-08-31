@@ -9,13 +9,15 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QFileDialog, QSpinBox, QLabel, QMessageBox
+from PyQt5.QtWidgets import QFileDialog, QSpinBox, QLabel, QMessageBox, QCheckBox
 
 import numpy as np
 from fractions import Fraction
 from fpdf import FPDF
 import random
 import subprocess
+from collections import defaultdict
+from scipy.optimize import minimize
 
 
 class Ui_MainWindow(object):
@@ -28,6 +30,7 @@ class Ui_MainWindow(object):
         self.comboBox = QtWidgets.QComboBox(self.centralwidget)
         self.comboBox.setGeometry(QtCore.QRect(200, 40, 321, 31))
         self.comboBox.setObjectName("comboBox")
+        self.comboBox.addItem("")
         self.comboBox.addItem("")
         self.comboBox.addItem("")
 
@@ -62,7 +65,7 @@ class Ui_MainWindow(object):
         self.lineEdit_2.setObjectName("lineEdit_2")
 
         self.pushButton_2 = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_2.setGeometry(QtCore.QRect(185, 350, 200, 31))
+        self.pushButton_2.setGeometry(QtCore.QRect(321, 350, 200, 31))
         self.pushButton_2.setObjectName("pushButton_2")
         self.pushButton_2.setVisible(False)
 
@@ -81,24 +84,24 @@ class Ui_MainWindow(object):
         #self.spinBox.setVisible(False)
 
         self.label_5 = QLabel(self.centralwidget)
-        self.label_5.setGeometry(QtCore.QRect(40, 250, 100, 31))
+        self.label_5.setGeometry(QtCore.QRect(40, 250, 220, 31))
         self.label_5.setObjectName("label_5")
         self.label_5.setText(
-            "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Столбцы:</span></p></body></html>")
+            "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Кол-во предприятий</span></p></body></html>")
         self.label_5.setVisible(False)
 
         self.columnsSpinBox = QSpinBox(self.centralwidget)
-        self.columnsSpinBox.setGeometry(QtCore.QRect(200, 250, 50, 31))
+        self.columnsSpinBox.setGeometry(QtCore.QRect(255, 250, 50, 31))
         self.columnsSpinBox.setObjectName("columnsSpinBox")
         self.columnsSpinBox.setMinimum(2)
         self.columnsSpinBox.setMaximum(10)
         self.columnsSpinBox.setVisible(False)
 
         self.label_6 = QLabel(self.centralwidget)
-        self.label_6.setGeometry(QtCore.QRect(311, 250, 100, 31))
+        self.label_6.setGeometry(QtCore.QRect(321, 250, 150, 31))
         self.label_6.setObjectName("label_6")
         self.label_6.setText(
-            "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Строки:</span></p></body></html>")
+            "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Кол-во машин</span></p></body></html>")
         self.label_6.setVisible(False)
 
         self.rowsSpinBox = QSpinBox(self.centralwidget)
@@ -107,6 +110,12 @@ class Ui_MainWindow(object):
         self.rowsSpinBox.setMinimum(2)
         self.rowsSpinBox.setMaximum(10)
         self.rowsSpinBox.setVisible(False)
+
+        self.PDF2CheckBox = QCheckBox(self.centralwidget)
+        self.PDF2CheckBox.setGeometry(QtCore.QRect(40, 300, 200, 31))
+        self.PDF2CheckBox.setObjectName("PDFCheckBox")
+        self.PDF2CheckBox.setText("Сгенерировать PDF файлы")
+        self.PDF2CheckBox.setVisible(False)
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -127,11 +136,73 @@ class Ui_MainWindow(object):
 
         self.pushButton_2.clicked.connect(self.run_task)
 
+        self.label_7 = QLabel(self.centralwidget)
+        self.label_7.setGeometry(QtCore.QRect(40, 250, 300, 31))
+        self.label_7.setObjectName("label_7")
+        self.label_7.setText(
+            "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Размер матрицы N:</span></p></body></html>")
+        self.label_7.setVisible(False)
+
+        self.spinBox_N = QSpinBox(self.centralwidget)
+        self.spinBox_N.setGeometry(QtCore.QRect(441, 250, 80, 31))
+        self.spinBox_N.setObjectName("spinBox_N")
+        self.spinBox_N.setMinimum(2)
+        self.spinBox_N.setMaximum(100)
+        self.spinBox_N.setVisible(False)
+
+        self.label_eps = QLabel(self.centralwidget)
+        self.label_eps.setGeometry(QtCore.QRect(40, 300, 150, 31))
+        self.label_eps.setObjectName("label_eps")
+        self.label_eps.setText(
+            "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Eps:</span></p></body></html>")
+        self.label_eps.setVisible(False)
+
+        self.lineEdit_eps = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_eps.setGeometry(QtCore.QRect(90, 300, 40, 31))
+        self.lineEdit_eps.setObjectName("lineEdit_eps")
+        self.lineEdit_eps.setVisible(False)
+
+        self.label_beta = QLabel(self.centralwidget)
+        self.label_beta.setGeometry(QtCore.QRect(140, 300, 150, 31))
+        self.label_beta.setObjectName("label_beta")
+        self.label_beta.setText(
+            "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Beta:</span></p></body></html>")
+        self.label_beta.setVisible(False)
+
+        self.lineEdit_beta = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_beta.setGeometry(QtCore.QRect(200, 300, 40, 31))
+        self.lineEdit_beta.setObjectName("lineEdit_beta")
+        self.lineEdit_beta.setVisible(False)
+
+        self.label_lambda = QLabel(self.centralwidget)
+        self.label_lambda.setGeometry(QtCore.QRect(250, 300, 150, 31))
+        self.label_lambda.setObjectName("label_lambda")
+        self.label_lambda.setText(
+            "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Lambda:</span></p></body></html>")
+        self.label_lambda.setVisible(False)
+
+        self.lineEdit_lambda = QtWidgets.QLineEdit(self.centralwidget)
+        self.lineEdit_lambda.setGeometry(QtCore.QRect(345, 300, 40, 31))
+        self.lineEdit_lambda.setObjectName("lineEdit_lambda")
+        self.lineEdit_lambda.setVisible(False)
+
+        self.PDF3CheckBox = QCheckBox(self.centralwidget)
+        self.PDF3CheckBox.setGeometry(QtCore.QRect(40, 350, 200, 31))
+        self.PDF3CheckBox.setObjectName("PDFCheckBox")
+        self.PDF3CheckBox.setText("Сгенерировать PDF файлы")
+        self.PDF3CheckBox.setVisible(False)
+
+        self.spinBox_N.textChanged.connect(self.check_fields)
+        self.lineEdit_lambda.textChanged.connect(self.check_fields)
+        self.lineEdit_beta.textChanged.connect(self.check_fields)
+        self.lineEdit_eps.textChanged.connect(self.check_fields)
+
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Генератор задач"))
         self.comboBox.setItemText(0, _translate("MainWindow", "Задача стационарного распределения"))
         self.comboBox.setItemText(1, _translate("MainWindow", "Задача динамического программирования"))
+        self.comboBox.setItemText(2, _translate("MainWindow", "Задача численной оптимизации"))
         self.label.setText(_translate("MainWindow",
                                       "<html><head/><body><p><span style=\" font-size:12pt; font-weight:500;\">Задача:</span></p></body></html>"))
         self.label_2.setText(_translate("MainWindow",
@@ -155,6 +226,16 @@ class Ui_MainWindow(object):
             self.columnsSpinBox.setVisible(False)
             self.label_6.setVisible(False)
             self.rowsSpinBox.setVisible(False)
+            self.PDF2CheckBox.setVisible(False)
+            self.PDF3CheckBox.setVisible(False)
+            self.label_7.setVisible(False)
+            self.spinBox_N.setVisible(False)
+            self.label_eps.setVisible(False)
+            self.lineEdit_eps.setVisible(False)
+            self.label_beta.setVisible(False)
+            self.lineEdit_beta.setVisible(False)
+            self.label_lambda.setVisible(False)
+            self.lineEdit_lambda.setVisible(False)
         elif task == "Задача динамического программирования":
             self.label_4.setVisible(False)
             self.spinBox.setVisible(False)
@@ -162,13 +243,33 @@ class Ui_MainWindow(object):
             self.columnsSpinBox.setVisible(True)
             self.label_6.setVisible(True)
             self.rowsSpinBox.setVisible(True)
-        else:
+            self.PDF2CheckBox.setVisible(True)
+            self.PDF3CheckBox.setVisible(False)
+            self.label_7.setVisible(False)
+            self.spinBox_N.setVisible(False)
+            self.label_eps.setVisible(False)
+            self.lineEdit_eps.setVisible(False)
+            self.label_beta.setVisible(False)
+            self.lineEdit_beta.setVisible(False)
+            self.label_lambda.setVisible(False)
+            self.lineEdit_lambda.setVisible(False)
+        elif task == "Задача численной оптимизации":
             self.label_4.setVisible(False)
             self.spinBox.setVisible(False)
             self.label_5.setVisible(False)
             self.columnsSpinBox.setVisible(False)
             self.label_6.setVisible(False)
             self.rowsSpinBox.setVisible(False)
+            self.PDF2CheckBox.setVisible(False)
+            self.PDF3CheckBox.setVisible(True)
+            self.label_7.setVisible(True)
+            self.spinBox_N.setVisible(True)
+            self.label_eps.setVisible(True)
+            self.lineEdit_eps.setVisible(True)
+            self.label_beta.setVisible(True)
+            self.lineEdit_beta.setVisible(True)
+            self.label_lambda.setVisible(True)
+            self.lineEdit_lambda.setVisible(True)
         self.check_fields()
 
     def check_fields(self):
@@ -180,6 +281,11 @@ class Ui_MainWindow(object):
                 self.pushButton_2.setVisible(False)
         elif task == "Задача динамического программирования":
             if self.spinBox_vars.value() > 0 and self.lineEdit_2.text() and self.columnsSpinBox.value() > 0 and self.rowsSpinBox.value() > 0:
+                self.pushButton_2.setVisible(True)
+            else:
+                self.pushButton_2.setVisible(False)
+        elif task == "Задача численной оптимизации":
+            if self.lineEdit_2.text() and self.lineEdit_eps.text() and self.lineEdit_beta.text() and self.lineEdit_lambda.text():
                 self.pushButton_2.setVisible(True)
             else:
                 self.pushButton_2.setVisible(False)
@@ -213,10 +319,63 @@ class Ui_MainWindow(object):
             solutions = [max_probability_allocation(n, m, variant) for variant in variants]
             latex_content_without_solution = create_latex_document(variants, solutions, n, m, with_solution=False)
             save_latex_file(f"{directory}/tasks_only.tex", latex_content_without_solution)
-            compile_latex_to_pdf(f"{directory}/tasks_only.tex", directory)
+            if self.PDF2CheckBox.isChecked():
+                compile_latex_to_pdf(f"{directory}/tasks_only.tex", directory)
             latex_content_with_solution = create_latex_document(variants, solutions, n, m, with_solution=True)
             save_latex_file(f"{directory}/tasks_with_solutions.tex", latex_content_with_solution)
-            compile_latex_to_pdf(f"{directory}/tasks_with_solutions.tex", directory)
+            if self.PDF2CheckBox.isChecked():
+                compile_latex_to_pdf(f"{directory}/tasks_with_solutions.tex", directory)
+        elif task == 'Задача численной оптимизации':
+            N = self.spinBox_N.value()
+            num_variants = self.spinBox_vars.value()  # задано
+            try:
+                epsilon = float(self.lineEdit_eps.text())  # задано
+                beta = float(self.lineEdit_beta.text())  # задано
+                lambda_ = float(self.lineEdit_lambda.text())  # задано
+            except ValueError:
+                self.show_message_box(text='Введите численное значение для eps, beta и lambda (разделитель - точка)')
+                return
+            directory = self.lineEdit_2.text()
+
+            variants = [[generate_positive_definite_matrix(N) for _ in range(num_variants)],
+                        [generate_a(N) for _ in range(num_variants)]]
+            solutions = []
+
+            for W, a in zip(variants[0], variants[1]):
+                print(f"Generated matrix W:\n{W}\n")
+                print(f"Generated a :\n{a}\n")
+                x0 = np.round(np.random.rand(N), 3)
+                print(f"Initial point x0: {x0}\n")
+
+                result = minimize(f, x0, args=(W, a))
+                minimum_x = result.x
+                minimum_value = result.fun
+
+                print(f"Minimum found by built-in function at point: {minimum_x}")
+                print(f"Value of the function at this point: {minimum_value}\n")
+
+                start_point = minimum_x + np.random.normal(0, 0.1, size=minimum_x.shape)
+                final_x, final_value, num_iterations = gradient_descent(f, start_point, W, a, epsilon, beta, lambda_)
+
+                print(f"Minimum found by gradient descent at point: {final_x}")
+                print(f"Value of the function at this point: {final_value}")
+                print(f"Number of iterations: {num_iterations}\n")
+
+                solutions.append((minimum_x, minimum_value, final_x, final_value, num_iterations, x0))
+
+            latex_content_without_solution = create_latex_document_new(variants, solutions, N, epsilon, beta, lambda_,
+                                                                   with_solution=False)
+            save_latex_file_new(f"{directory}/tasks.tex", latex_content_without_solution)
+
+            if self.PDF3CheckBox.isChecked():
+                compile_latex_to_pdf_new(f"{directory}/tasks.tex")
+
+            latex_content_with_solution = create_latex_document_new(variants, solutions, N, epsilon, beta, lambda_,
+                                                                with_solution=True)
+            save_latex_file_new(f"{directory}/solutions.tex", latex_content_with_solution)
+
+            if self.PDF2CheckBox.isChecked():
+                compile_latex_to_pdf_new(f"{directory}/solutions.tex")
 
         self.show_message_box(text="Файлы успешно сгенерированы")
 
@@ -444,6 +603,206 @@ def compile_latex_to_pdf(latex_filename, output_directory):
             f.write(result.stderr)
     else:
         print("PDF file created successfully.")
+
+
+'''Task 3'''
+
+
+def generate_non_singular_matrix(N):
+    while True:
+        matrix = np.random.randint(-6, 7, (N, N))
+        if np.linalg.det(matrix) != 0:
+            return matrix
+
+
+def transpose_and_multiply(matrix):
+    transpose = matrix.T
+    product = np.dot(matrix, transpose)
+    return transpose, product
+
+
+def scale_and_round(matrix):
+    scaled_matrix = np.round(matrix / 10).astype(int)
+    return scaled_matrix
+
+
+def is_positive_definite(matrix):
+    return np.all(np.linalg.eigvals(matrix) > 0)
+
+
+def generate_positive_definite_matrix(N):
+    while True:
+        matrix = generate_non_singular_matrix(N)
+        transpose, product = transpose_and_multiply(matrix)
+        final_matrix = scale_and_round(product)
+        if is_positive_definite(final_matrix):
+            return final_matrix
+
+
+def f(x, W, a):
+    return x.T @ W @ x + (x - a).T @ (x - a)
+
+
+def gradient(f, x, W, a):
+    grad = np.zeros_like(x)
+    h = 1e-5
+    for i in range(len(x)):
+        x_h1 = np.copy(x)
+        x_h2 = np.copy(x)
+        x_h1[i] += h
+        x_h2[i] -= h
+        grad[i] = (f(x_h1, W, a) - f(x_h2, W, a)) / (2 * h)
+    return grad
+
+
+def gradient_descent(f, x0, W, a, epsilon, beta, lambda_):
+    x = np.copy(x0)
+    num_iterations = 0
+    while True:
+        grad = gradient(f, x, W, a)
+        if np.max(np.abs(grad)) < epsilon:
+            break
+        t = beta
+        while f(x - t * grad, W, a) > f(x, W, a):
+            t *= lambda_
+        x = x - t * grad
+        num_iterations += 1
+    return x, f(x, W, a), num_iterations
+
+
+def create_latex_table_new(W, a):
+    N = W.shape[0]
+    latex = "\\begin{align*}\n"
+    latex += f"f({', '.join(f'x_{{{j + 1}}}' for j in range(N))}) &= "
+    linear_terms = [0] * N
+    free_term = 0
+    first_term = True
+    line_length = 0
+
+    def add_term(term):
+        nonlocal latex, line_length, first_term
+        if line_length + len(term) > 80:
+            latex += " \\\\ \n& "
+            line_length = 0
+        if not first_term:
+            latex += f" + {term}" if term[0] != '-' else f" {term}"
+        else:
+            latex += term
+            first_term = False
+        line_length += len(term)
+
+    for i in range(N):
+        for j in range(i, N):
+            coef = W[i, j]
+            if i == j:
+                term = f"{coef + 1}x_{{{i + 1}}}^2"
+            else:
+                term = f"{2 * coef}x_{{{i + 1}}}x_{{{j + 1}}}"
+
+            if coef != 0:
+                add_term(term)
+
+    for i in range(N):
+        linear_terms[i] -= 2 * a[i]
+        free_term += a[i] ** 2
+
+    for i in range(N):
+        if linear_terms[i] != 0:
+            term = f"{linear_terms[i]}x_{{{i + 1}}}"
+            add_term(term)
+
+    if free_term != 0:
+        add_term(f"{free_term}")
+
+    latex += "\n\\end{align*}\n"
+    return latex
+
+
+def create_latex_document_new(variants, solutions, N, epsilon, beta, lambda_, with_solution=False):
+    latex = "\\documentclass{article}\n"
+    latex += "\\usepackage[utf8]{inputenc}\n"
+    latex += "\\usepackage[russian]{babel}\n"
+    latex += "\\usepackage{amsmath}\n"
+    latex += "\\usepackage{geometry}\n"
+    latex += "\\geometry{a4paper, margin=1in}\n"
+    latex += "\\begin{document}\n"
+
+    variant_pairs = list(zip(variants[0], variants[1]))
+
+    for i, ((W, a), (minimum_x, minimum_value, final_x, final_value, num_iterations, x0)) in enumerate(
+            zip(variant_pairs, solutions)):
+        latex += f"\\section*{{\\textbf{{Вариант № {i + 1}}}}}\n"
+        latex += "{Найти минимум функции:}\n"
+        latex += create_latex_table_new(W, a)
+        latex += "методом градиентного спуска с дроблением шага.\n"
+        latex += "\\newline\n"
+        latex += "В качестве начального приближения взять:\n"
+        latex += "$$\n"
+        latex += "\\begin{bmatrix}\n"
+        latex += "\\\\\n".join(f"x_{{{j + 1}}}" for j in range(N)) + "\n"
+        latex += "\\end{bmatrix}\n"
+        latex += " = \n"
+        latex += "\\begin{bmatrix}\n"
+        latex += "\\\\\n".join(map(str, x0)) + "\n"
+        latex += "\\end{bmatrix}\n"
+        latex += "$$\n"
+        latex += f"В качестве точности вычисления взять $\\varepsilon = {epsilon}.$\n"
+        latex += "\\newline\n"
+        latex += "В качестве критерия остановки:\n"
+        latex += "$$\n"
+        latex += "\\max\\limits_{1 \\leq j \\leq n} \\left| \\frac{\\partial f_0 (x^k)}{\\partial x_j} \\right| < \\varepsilon.\n"
+        latex += "$$\n"
+        latex += f"В качестве начальной длины шага взять $\\beta = {beta}.$\n"
+        latex += "\\newline\n"
+        latex += f"В качестве коэффициента дробления $\\lambda = {lambda_}.$\n"
+        latex += "\\newline\n"
+
+        if with_solution:
+            latex += "\\textbf{Решение:}\n"
+            latex += "\\newline\n"
+            latex += "Минимум найден встроенной функцией в точке:\n"
+            latex += "$$\n"
+            latex += "\\begin{bmatrix}\n"
+            latex += "\\\\\n".join(map(str, minimum_x)) + "\n"
+            latex += "\\end{bmatrix}\n"
+            latex += "$$\n"
+            latex += f"Значение функции в точке:\n {minimum_value}.\n"
+            latex += "\\newline\n"
+            latex += "Минимум найденный методом градиентного спуска в точке:\n"
+            latex += "$$\n"
+            latex += "\\begin{bmatrix}\n"
+            latex += "\\\\\n".join(map(str, final_x)) + "\n"
+            latex += "\\end{bmatrix}\n"
+            latex += "$$\n"
+            latex += f"Значение функции в точке:\n {final_value}.\n"
+            latex += "\\newline\n"
+            latex += f"Число итераций:\n {num_iterations}.\n"
+
+        if i < len(variants[0]) - 1:
+            latex += "\\newpage\n"
+
+    latex += "\\end{document}\n"
+    return latex
+
+
+def save_latex_file_new(filename, content):
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+
+def compile_latex_to_pdf_new(latex_filename):
+    result = subprocess.run(["pdflatex", latex_filename], capture_output=True, text=True)
+    if result.returncode != 0:
+        print("Error during LaTeX compilation:")
+        print(result.stderr)
+        with open("error.log", 'w') as f:
+            f.write(result.stderr)
+    else:
+        print("PDF file created successfully.")
+
+
+def generate_a(N):
+    return np.random.randint(-10, 11, N)
 
 
 if __name__ == "__main__":
